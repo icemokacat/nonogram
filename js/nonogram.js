@@ -107,6 +107,10 @@ class Cell {
         this.end = flag;
     }
 
+    isEnd() {
+        return this.end;
+    }
+
     getValue() {
         return this.value;
     }
@@ -196,6 +200,37 @@ class Nonogram {
         return grid;
     }
 
+    async cloneDeep(obj) {
+        // obj is array<array<Cell>>
+        const objCopy = [];
+        for (let i = 0; i < obj.length; i++) {
+            objCopy.push([]);
+            for (let j = 0; j < obj[i].length; j++) {
+                const isFixed = obj[i][j].fixed();
+                const isMarked = obj[i][j].getMarked();
+                const start = obj[i][j].isStart();
+                const end = obj[i][j].isEnd();
+                const cell = new Cell();
+                if(isMarked){
+                    cell.mark();
+                }else{
+                    cell.unmark();
+                }
+                if(isFixed){
+                    cell.setFixed();
+                }
+                if(start){
+                    cell.setStart(true);
+                }
+                if(end){
+                    cell.setEnd(true);
+                }
+                objCopy[i].push(cell);
+            }
+        }
+        return objCopy;
+    }
+
     getGrid() {
         return this.grid;
     }
@@ -206,12 +241,13 @@ class Nonogram {
         * @param {Array<Array<Cell>>} grid
         * @returns {Array<Array<number>>}
      */
-    toArraysFromGrid(gridArrays) {
+    async toArraysFromGrid(gridArrays) {
+        const gridObjArraysCopy = await this.cloneDeep(gridArrays);
         const grid = [];
         for (let i = 0; i < this.rowNum; i++) {
             grid.push([]);
             for (let j = 0; j < this.colNum; j++) {
-                grid[i].push(gridArrays[i][j].getValue());
+                grid[i].push(gridObjArraysCopy[i][j].getValue());
             }
         }
         return grid;
@@ -650,7 +686,6 @@ class Nonogram {
             }
         }
 
-        return this.toArraysFromGrid(this.grid);
     }
 
     async solve () {
@@ -662,20 +697,15 @@ class Nonogram {
 
         await this.setFixSolve();
 
-        let initSolveArray = this.toArraysFromGrid(this.grid);
+        let initSolveArray = await this.toArraysFromGrid(this.grid);
         let initSolve = await this.isValidAnswer(initSolveArray);
-
-        let test = 1;
-        if(test == 1){
-            result.solved = true;
-            result.answer = this.toArraysFromGrid(this.grid);
-            return result;
-        }
 
         if(initSolve == true) {
             result.solved = true;
-            result.answer = this.toArraysFromGrid(this.grid);
+            result.answer = clone(initSolveArray);
             return result;
+        }else{
+            console.log('initSolve fail...')
         }
 
         let limit = 1000000;
@@ -685,17 +715,18 @@ class Nonogram {
         while(result.solved != true && limit >= 0 ) {                
             tryCnt++;
             if(limit < 0) {
-                console.warn('too many loop solve');
+                console.info('too many loop solve');
                 result.solved = false;
-                result.answer = this.toArraysFromGrid(this.grid);
+                result.answer = await this.toArraysFromGrid(this.grid);
                 break;
             }else{
                 this.resetUnfixedMark();
-                let tempSolveGrid = await this.solveBlock();
-                result.solved = await this.isValidAnswer(tempSolveGrid);
-                result.answer = tempSolveGrid;
+                await this.solveBlock();
+                result.answer = await this.toArraysFromGrid(this.grid);
+                result.solved = await this.isValidAnswer(result.answer);
+                
                 if(result.solved == true) {
-                    console.info(' solved in ['+(1000000 - limit)+']');
+                    console.info(' solved in ['+(1000000 - limit)+']');                    
                     break;
                 }else{
                     limit--;
@@ -707,7 +738,7 @@ class Nonogram {
         }
 
         // ? 10000 번 이상 반복하지 않았는데도 while 문을 빠져나온 경우
-        if (limit >= 0 && result.solved == false) {
+        if (limit >= 0 && result.solved != true) {
             console.info(`is invalid this while loop [${limit}]`)
         }
 
