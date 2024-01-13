@@ -213,6 +213,9 @@
                         return;
                     }else{
                         // draw answer
+                        // 성공시 .game 의 border 를 1px solid blue 로 변경
+                        const game = document.querySelector('.game');
+                        game.style.border = '1px solid blue';
                         const answer = result.answer;
                         drawByAnswer(answer);    
                     } 
