@@ -181,9 +181,23 @@
             const colCnt = rows;
 
             (async function() {
+
+                // 시작전 시간을 측정
+                const start = performance.now();
+
                 const result = await nonoFinder.solve(rowCnt, colCnt, rowHints, colHints);
 
-                console.log(result);
+                // 종료후 시간을 측정
+                const end = performance.now();
+
+                // 60초 이상 걸린 경우 hh : mm : ss 형태로 출력
+                if (end - start > 60000) {
+                    console.log('time : ' + new Date(end - start).toISOString().substr(11, 8));
+                } else if(end - start > 1000){
+                    console.log('time : ' + (end - start) / 1000 + 's');
+                }else{
+                    console.log('time : ' + (end - start) + 'ms');
+                }
 
                 // valid hint
                 if (result.valid === false) {
@@ -193,7 +207,9 @@
                 }else{
                     // if can't find answer 
                     if (result.solved === false) {
-                        alert('no answer');
+                        console.error('can\'t find answer');
+                        // 일단 틀려도 그려보자
+                        drawByAnswer(result.answer);
                         return;
                     }else{
                         // draw answer
