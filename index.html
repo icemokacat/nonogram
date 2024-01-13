@@ -326,7 +326,7 @@
         </div>
         
     </div>
-
+    <script src="find.js"></script>
     <script>
         const rownumberObj = document.querySelector('#rownumber');
 
@@ -336,9 +336,9 @@
         const removeBtn = document.querySelector('#remove');
         const saveBtn = document.querySelector('#save');
 
-        let rowblocks = [];
-        let colblocks = [];
-        let tempCopyCols = [];
+        let rows = 0;
+        let rowHints = [];
+        let colHints = [];
 
         createBoardBtn.addEventListener('click', createBoard);
         findAnswerBtn.addEventListener('click', findAnswer);
@@ -346,50 +346,13 @@
         removeBtn.addEventListener('click', removeHints);
         saveBtn.addEventListener('click', save);
 
-        // .game drag -> toggle block
+        // cell click event
         document.addEventListener('mousedown', function(e){
             const target = e.target;
             if(target.classList.contains('game-cell')){
                 toggleBlock(target);
             }
         });
-
-        function test(){
-            let testArr = [
-                [1,1,0,0,1],
-                [1,1,0,0,1],
-                [1,1,0,0,1],
-                [0,0,0,0,1],
-                [1,1,1,0,1]
-            ];
-            let answer = [
-                [1,1,1,0,1],
-                [1,1,1,0,1],
-                [0,0,0,0,1],
-                [0,0,0,0,0],
-                [1,1,1,1,1]
-            ];
-            let changed = changeCols(testArr);
-            if(JSON.stringify(answer) === JSON.stringify(changed)){
-                console.log('same');
-            }else{
-                console.log('different');
-                console.log(answer);
-                console.log(changed);
-            }
-        }
-        function changeCols(arr){
-            let result = [];
-            let temp = [];
-            for(let i = 0; i < arr.length; i++){
-                for(let j = 0; j < arr[i].length; j++){
-                    temp.push(arr[j][i]);
-                }
-                result.push(temp);
-                temp = [];
-            }
-            return result;
-        }
 
         function toggleBlock(dom){
             if(dom.classList.contains('active')){
@@ -399,9 +362,7 @@
             }
         }
 
-        function blockReset(){
-            rowblocks = [];
-            colblocks = [];
+        function blockReset(){            
             const gameCell = document.querySelectorAll('.game-cell');
             gameCell.forEach(function(item){
                 item.classList.remove('active');
@@ -409,326 +370,127 @@
         }
 
         function findAnswer (){
-            blockReset();
-            // 먼저 hint 의 합이 rownumber 과 같거나 작은지 확인한다.
-            const rownumber = rownumberObj.value;
-            // 이때 row 를 돌면서 각각 확인 한다.
-            const gameRowContainer = document.querySelectorAll('.game-row-container');
+            blockReset();   
+            // rowHints, colHints 를 input 박스에서 가져와 배열화 시킨다.
+            let result = setHints();   
+            
+            rowHints = result.rowHints;
+            colHints = result.colHints;
 
-            let rowHints = [];
-            let colHints = [];
+            const rowCnt = rows;
+            const colCnt = rows;
 
-            // 1. row 확인
-            gameRowContainer.forEach(function(item){
-                const hintRowContainer = item.querySelector('.hint-row-container');
-                const hintRow = hintRowContainer.querySelectorAll('.hint');
-                let hintRowSum = 0;
-                let hintRowArray = [];
-                hintRow.forEach(function(item){
-                    hintRowSum += parseInt(item.value) + 1;
-                    hintRowArray.push(parseInt(item.value));
-                });
-                rowHints.push(hintRowArray);
-                // 마지막에는 -1 을 빼준다.
-                hintRowSum -= 1;
+            (async function() {
+                const result = await nonoFinder.solve(rowCnt, colCnt, rowHints, colHints);
 
-                // rownumber 보다 작거나 같은지 확인한다.
-                if(hintRowSum > rownumber){
-                    // 해당 index 의 모든 hint input 테두리를 빨간색으로 바꾼다.
-                    hintRow.forEach(function(item){
-                        item.style.border = '2px solid red';
-                    });
-                    // 그리고 불가능 선언후 리턴한다.
-                    alert('해당 row 의 hint 의 합이 rownumber 보다 큽니다.');
+                console.log(result);
+
+                // valid hint
+                if (result.valid === false) {
+                    const msg = result.notValidReason;
+                    alert(msg);
                     return;
-                }
-            });
-
-            // 2. col 확인
-            const gameColHint = document.querySelector('.game-col-hint');
-            gameColHint.childNodes.forEach(function(item){
-                if(item.classList.contains('hint-col-container')){
-                    // hind 의 합을 구한다.
-                    const hintCol = item.querySelectorAll('.hint');
-                    let hintColSum = 0;
-                    let hintColArray = [];
-                    hintCol.forEach(function(item){
-                        hintColSum += parseInt(item.value) + 1;
-                        hintColArray.push(parseInt(item.value));
-                    });
-                    colHints.push(hintColArray);
-
-                    // 마지막에는 -1 을 빼준다.
-                    hintColSum -= 1;
-
-                    // rownumber 보다 작거나 같은지 확인한다.
-                    if(hintColSum > rownumber){
-                        // 해당 index 의 모든 hint input 테두리를 빨간색으로 바꾼다.
-                        hintCol.forEach(function(item){
-                            item.style.border = '2px solid red';
-                        });
-                        // 그리고 불가능 선언후 리턴한다.
-                        alert('해당 col 의 hint 의 합이 rownumber 보다 큽니다.');
+                }else{
+                    // if can't find answer 
+                    if (result.solved === false) {
+                        alert('no answer');
                         return;
-                    }
+                    }else{
+                        // draw answer
+                        const answer = result.answer;
+                        drawByAnswer(answer);    
+                    } 
                 }
+                
+            })();
+        }
+
+        function setHints(){
+            const result = {
+                rowHints: [],
+                colHints: []
+            };
+
+            const hintRowContainer = document.querySelectorAll('.hint-row-container');
+            const hintColContainer = document.querySelectorAll('.hint-col-container');
+
+            hintRowContainer.forEach(function(item){
+                const hintRow = item.querySelectorAll('.hint');
+                const rowEleHints = [];
+                hintRow.forEach(function(item){                    
+                    if (item){
+                        if(item.value != '' && item.value != 0){
+                            rowEleHints.push(Number(item.value));
+                        }
+                    }
+                });
+                result.rowHints.push(rowEleHints);
             });
 
-            // 3. 먼저 전달 받은 hints 로 블럭을 만든다.
-            drawByHints(rowHints, 'row');
+            hintColContainer.forEach(function(item){
+                const hintCol = item.querySelectorAll('.hint');
+                const colEleHints = [];
+                hintCol.forEach(function(item){
+                    if (item){
+                        if(item.value != '' && item.value != 0){
+                            colEleHints.push(Number(item.value));
+                        }
+                    }
+                });
+                result.colHints.push(colEleHints);
+            });
 
-            // 4. col 의 hints 로 블럭을 만든다.
-            drawByHints(colHints, 'col');
+            return result;
+        }
 
-            // 5. 첫번째 확인
-            if(checkValidHints() === false){
-                alert('힌트가 불가능합니다.');
+        /**
+        * @example
+        * array = [
+        *   [1,1,1,0,1],
+        *   [1,0,0,0,0],
+        *   [1,1,0,0,0],
+        *   [0,0,0,0,0],
+        *   [1,1,0,1,0]
+        * ]
+        * @param {Array.<Array.<Number>>} array
+        * @return void : draw game
+        */
+        function drawByAnswer(answer){
+            // array 는 2차원 배열이다.
+            // 행 기준으로 아래로 돌면서 그린다.
+            if (answer === undefined || answer.length === 0) {
+                console.warn('answer is undefined or empty');
                 return;
             }
-        }
-
-        function checkValidHints(){
-            // 만들어 놓은 rowblocks 와 colblocks 를 이용하여
-            // 해당 힌트가 가능한지 확인한다.
-
-            // 1. rowblocks 를 돌면서 각각의 합을 구한다.
-            let rowblocksSum = 0;
-            rowblocks.forEach(function(item){
-                let sum = 0;
-                item.forEach(function(item){
-                    sum += item;
-                });
-                rowblocksSum += sum;
-            });
-            // 2. colblocks 를 돌면서 각각의 합을 구한다.
-            let colblocksSum = 0;
-            colblocks.forEach(function(item){
-                let sum = 0;
-                item.forEach(function(item){
-                    sum += item;
-                });
-                colblocksSum += sum;
-            });
-
-            // 3. rowblocksSum 과 colblocksSum 이 같은지 확인한다.
-            if(rowblocksSum !== colblocksSum){
-                return false;
+            // 검증 array 의 모든 값이 숫자 여야 한다.
+            if (answer.some(row => row.some(col => typeof col !== 'number'))) {
+                console.warn('answer must be number array');
+                return;
             }
-
-            // 4. rowblocks 와 colblocks 이 완벽히 같은지 확인한다.
-            return itsSuccess();
-        }
-
-        function itsSuccess(){
-            // 이때 colblocks 는 rowblocks 의 반대로 만들어야 한다.
-            // 먼저 복사를 한다.
-            let colblocksCopy = changeCols(colblocks);          
-            
-            if(JSON.stringify(rowblocks) === JSON.stringify(colblocksCopy)){
-                return true;
+            // create 한 board 의 row 수와 answer 의 row 수가 같아야 한다.
+            if (answer.length !== rows) {
+                console.warn('answer row length '+answer.length+' is not equal to board row length');
+                return;
             }else{
-                return false;
-            }
-        }
-
-        function drawByHints(array, drawType){
-            // array 는 2차원 배열이다.
-            // 1. 먼저 row 를 돌면서 각각의 hint 에 맞게 블럭을 그린다.
-            let count = 0;
-            if('row' === drawType){
+                // create 한 board 의 col 수와 answer 의 col 수가 같아야 한다.
                 const gameRowContainer = document.querySelectorAll('.game-row-container');
                 gameRowContainer.forEach(function(item,index){
-                    let pointer = 0;
                     const gameRow = item.querySelector('.game-row');
-                    let rowArray = array[index];
-                    if(rowblocks[index] === undefined){
-                        rowblocks[index] = [];
-                    }
-                    rowArray.forEach(function(item){
-                        for(let i = 0; i < item; i++){
-                            const gameCell = gameRow.childNodes[pointer];
-                            gameCell.classList.add('active');
-                            pointer++;
-                            // rowblocks 해당 위치에 1을 넣는다.                            
-                            rowblocks[index].push(1);
-                            // 마지막 블럭이라면 0을 넣는다. 
-                            if(i === item - 1){
-                                rowblocks[index].push(0);
-                            }
-                        }
-                        pointer++;
-                    });
-                    // 마지막 블럭 0을 제거한다.
-                    rowblocks[index].pop();
-                    // 나머지 블럭은 0으로 채운다.
-                    let currentLength = rowblocks[index].length;
-                    let rowLength = gameRow.childNodes.length;
-                    for(let i = currentLength; i < rowLength; i++){
-                        rowblocks[index].push(0);
-                    }
-                })
-            }else{
-                // col 일때는 배열만 만들어 놓는다.
-                const gameColHint = document.querySelector('.game-col-hint');
-                gameColHint.childNodes.forEach(function(item){
-                    if(item.classList.contains('hint-col-container')){
-                        let colArray = array[count];
-                        if(colblocks[count] === undefined){
-                            colblocks[count] = [];
-                        }
-                        colArray.forEach(function(item){
-                            for(let i = 0; i < item; i++){
-                                // colblocks 해당 위치에 1을 넣는다.
-                                colblocks[count].push(1);
-                                // 마지막 블럭이라면 0을 넣는다.
-                                if(i === item - 1){
-                                    colblocks[count].push(0);
-                                }
-                            }
-                        });
-                        // 마지막 블럭 0을 제거한다.
-                        colblocks[count].pop();
-                        // 나머지 블럭은 0으로 채운다.
-                        let currentLength = colblocks[count].length;
-                        let colLength = gameColHint.childNodes.length;
-                        for(let i = currentLength; i < colLength; i++){
-                            colblocks[count].push(0);
-                        }
-                        count++;
+                    if(gameRow.childNodes.length !== answer[index].length){
+                        console.warn('answer col length is not valid');
+                        return;
                     }
                 });
             }
-        }
-
-        function pushArray(array, index, direction){
-
-            const result = {}
-            let available = false;
-
-            // 이제 arrayCopy 로만 이동을 먼저 시킨 후 정상이면 array 에 복사한다.
-            let arrayCopy = array.slice();
-
-            // 1. 먼저 0만 존재하거나 1만 존재하는 경우는 묶음이 없으므로
-            // 체크 후 바로 리턴한다.
-            if(arrayCopy.indexOf(0) === -1 || arrayCopy.indexOf(1) === -1){
-                return {
-                    result: arrayCopy,
-                    available: false
-                }
-            }
-
-            // 2. 묶음의 갯수를 구한다.
-            let trainCount = 0;
-            let trains = [];
-
-            let findToggle = false;
-            let tempTrain = [];
-            let startTrainIndex = 0;
-            let findCount = 0;
-            for(let i = 0; i < array.length; i++){
-                if(array[i] === 1){
-                    tempTrain.push(array[i]);
-                    if(findToggle === false){
-                        findToggle = true;
-                        trainCount++;
-                        findCount++;
-                        if(findCount === index + 1){
-                            startTrainIndex = i;
-                        }
-                    }
-                }else{
-                    trains.push(tempTrain);
-                    tempTrain = [];
-                    findToggle = false;
-                }
-            }
-
-            // 3. 이동 시키고자 하는 묶음의 길이를 구한다.
-            let trainLength = trains[index].length;
-
-            // 4. 방향에 따라서 묶음을 이동시킨다.
-            let switchResult = switchNum(arrayCopy, startTrainIndex, trainLength, direction);
-            if(switchResult.available === true){
-                available = true;
-                arrayCopy = switchResult.result;
-            }
-
-            // 5. 묶음의 갯수가 달라 졌는지 확인한다.
-            let trainCount2 = 0;
-            let findToggle2 = false;
-
-            for(let i = 0; i < arrayCopy.length; i++){
-                if(arrayCopy[i] === 1){
-                    if(findToggle2 === false){
-                        findToggle2 = true;
-                        trainCount2++;
-                    }
-                }else{
-                    findToggle2 = false;
-                }
-            }
-
-            if(trainCount !== trainCount2){
-                available = false;
-            }
-
-            // 7. available 이 true 일때만 결과를 리턴한다.
-            if(available === true){
-                result.result = arrayCopy;
-                result.available = true;
-                return result;
-            }else{
-                result.result = array;
-                result.available = false;
-                return result;
-            }
-        }
-
-        function switchNum(array,start,length,direction){
-
-            // 1. 먼저 array 의 범위를 벗어나는지 확인한다.
-            if(start-1 < 0 || length+1 > array.length){
-                return {
-                    result: array,
-                    available: false
-                }
-            }
-
-            // 2. 숫자가 서로 다른지 확인한다.
-            if('left' === direction){
-                if(array[start-1] === array[length]){
-                    return {
-                        result: array,
-                        available: false
+            const gameRowContainer = document.querySelectorAll('.game-row-container');
+            // 1 이면 active, 0 이면 nothing
+            for(let i = 0; i < answer.length; i++){
+                const gameRow = gameRowContainer[i].querySelector('.game-row');
+                for(let j = 0; j < answer[i].length; j++){
+                    if(answer[i][j] === 1){
+                        gameRow.childNodes[j].classList.add('active');
                     }
                 }
-            }else if('right' === direction){
-                if(array[start] === array[length+1]){
-                    return {
-                        result: array,
-                        available: false
-                    }
-                }
-            }else{
-                return {
-                    result: array,
-                    available: false
-                }
-            }
-
-            // 3. 이동이 가능하다면 이동시킨다.
-            let arrayCopy = array.slice();
-            if('left' === direction){
-                arrayCopy[start-1] = array[length+1];
-                arrayCopy[length+1] = array[start-1];
-            }else if('right' === direction){
-                arrayCopy[start] = array[length+1];
-                arrayCopy[length+1] = array[start];
-            }
-
-            return {
-                result: arrayCopy,
-                available: true
             }
         }
 
@@ -764,6 +526,7 @@
 
         function reset(){
             blockReset();
+            rows = 0;
             const game = document.querySelector('.game');
             game.innerHTML = '';
         }
@@ -772,6 +535,7 @@
             reset();
 
             const rownumber = rownumberObj.value;
+            rows = Number(rownumber);
             const game = document.querySelector('.game');
 
             // create row
