@@ -138,8 +138,11 @@ button.plus:hover{
     color: #646464;
 
     -webkit-box-shadow: none;
+    box-shadow: none;
     -webkit-appearance: none;
+    appearance: none;
     -webkit-border-radius: 0;
+    border-radius: 0;
 
     outline: none;
 }
