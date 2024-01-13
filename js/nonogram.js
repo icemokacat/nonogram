@@ -517,39 +517,41 @@ class Nonogram {
     async getBlockTrainCnt(row) {
         // block 이 연속되게 칠해진 갯수를 구한다.
         // row 는 그냥 한줄이다.
-        let rowLength = row.length;
+        const rowLength = row.length;
         let blockCount = 0;
-        let blockTrainCnt = 0;
+        let blockGroupCnt = 0;
+        let markStart = false;
 
         for(let i = 0; i < rowLength; i++) {
             if(row[i].getMarked() == true) {
-                blockCount++;
+                blockCount = blockCount + 1;
+                if(markStart == false) {
+                    markStart = true;
+                }else if (markStart == true && i == rowLength - 1) {
+                    // 마지막 칸이 mark 된 경우
+                    blockGroupCnt = blockGroupCnt + 1;
+                }
             }else{
-                if(blockCount > 0) {
-                    blockTrainCnt++;
-                    blockCount = 0;
+                if(markStart == true) {
+                    blockGroupCnt = blockGroupCnt + 1;
+                    markStart = false;
                 }
             }
         }
 
-        if(blockCount > 0) {
-            blockTrainCnt++;
-        }
-
-        return blockTrainCnt;
+        return blockGroupCnt;
     } // end of getBlockTrainCnt
 
-    resetUnfixedMark() {
+    async resetUnfixedMark() {
         // 고정되지 않은 cell 을 모두 unmark 한다.
         for(let i = 0; i < this.rowNum; i++) {
             let row = this.grid[i];
-            this.resetUnfixedMarkRow(row);
+            await this.resetUnfixedMarkRow(row);
         }
     } // end of resetUnfixedMark
 
-    resetUnfixedMarkRow(row) {
+    async resetUnfixedMarkRow(row) {
         // 고정되지 않은 cell 을 모두 unmark 한다.
-        let unmarkCnt = 0;
         for(let i = 0; i < row.length; i++) {            
             if(row[i].fixed() == false) {
                 const start = i;
@@ -557,14 +559,12 @@ class Nonogram {
                 const mark = false;
                 const fixed = false;
                 const changer = new Changer(start, end, mark, fixed);
-                blockMark(changer, row);
-                unmarkCnt++;
+                await blockMark(changer, row);
             }
         }
-        return unmarkCnt;
     } // end of resetUnfixedMarkRow
 
-    isAllFixed(row) {
+    async isAllFixed(row) {
         // 모든 cell 이 고정되었는지 확인한다.
         let rowLength = row.length;
         for(let i = 0; i < rowLength; i++) {
@@ -599,13 +599,26 @@ class Nonogram {
         const limitRandom = 1000;
         
         // 행 힌트를 기준으로 행을 채운다.
-        let gridRowCnt = this.grid.length;
+        const gridRowCnt = this.grid.length;
+        let fixRowCnt = 0;
+
+        // start for
         for (let i = 0; i < gridRowCnt; i++) {
-            let allFixRow = this.isAllFixed(this.grid[i]);
+            // A. 확정 여부 확인
+            let allFixRow = await this.isAllFixed(this.grid[i]);
+            if(gridRowCnt == fixRowCnt) {
+                // 모든 행과 열이 확정된 경우 pass
+                return true;
+            }
             if(allFixRow == true) {
                 // 해당 행이 모두 확정된 경우 pass
+                fixRowCnt = fixRowCnt + 1;
                 continue;
             }
+
+            // B. Solve .. 
+
+            // B-1. 힌트가 없는 경우 모두 흰색으로 채운다. (이때는 모두 확정 시킨다.)
             const idx = i;
             const hintCnt = this.rowHints[idx].length;
             if(hintCnt == 0) {
@@ -613,9 +626,12 @@ class Nonogram {
                 const sidx = 0;
                 const eidx = this.grid[idx].length - 1;
                 const changer = new Changer(sidx, eidx, false, true);
-                blockMark(changer, this.grid[idx]);
+                await blockMark(changer, this.grid[idx]);
                 continue;
             }
+
+            // B-2. 힌트가 있는 경우
+            // 힌트의 갯수와 연속되게 칠해진 block 의 갯수가 같은지 확인한다.
             let trainCnt = await this.getBlockTrainCnt(this.grid[idx]);
 
             // block 의 갯수가 다른 경우 같아 질때 까지 랜덤하게 채운다. (힌트의 갯수 와 연속되게 칠해진 block 의 갯수)
@@ -635,9 +651,14 @@ class Nonogram {
                     break;
                 }
                 this.resetUnfixedMarkRow(this.grid[idx]);
-                await this.setHintRandomeMark(this.grid[idx], this.rowHints[idx]);
+                if(this.grid[idx]) {
+                    await this.setHintRandomeMark(this.grid[idx], this.rowHints[idx]);
+                }else{
+                    console.warn('this.grid[idx] is null ran : '+ran+' idx : '+idx);
+                }
             }
-        }
+
+        } // end of for
 
     } // end of solveBlock
 
@@ -670,7 +691,6 @@ class Nonogram {
                 result.solved = false;
                 break;
             }else{
-                this.resetUnfixedMark();
                 await this.solveBlock();
                 result.solved = await this.isValidGrid();
                 
@@ -773,7 +793,7 @@ class Nonogram {
                 }
 
                 if(i == rowLength - 1 && markedCnt != hintValue) {
-                    console.log('markedCnt : '+markedCnt+' != hintValue : '+hintValue)
+                    // console.log('markedCnt : '+markedCnt+' != hintValue : '+hintValue)
                     return false;
                 }
             }

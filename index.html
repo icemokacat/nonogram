@@ -206,6 +206,7 @@
                     alert('유효하지 않은 힌트입니다.');
                     return;
                 }else{
+                    const game = document.querySelector('.game');
                     // if can't find answer 
                     if (result.solved === false) {
                         game.style.border = '1px solid red';
@@ -214,8 +215,7 @@
                         drawByAnswer(result.grid);
                     }else{
                         // draw answer
-                        // 성공시 .game 의 border 를 1px solid blue 로 변경
-                        const game = document.querySelector('.game');
+                        // 성공시 .game 의 border 를 1px solid blue 로 변경                        
                         game.style.border = '1px solid blue';
                         drawByAnswer(result.grid);    
                     } 
