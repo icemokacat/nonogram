@@ -1,3 +1,91 @@
+'use strict';
+class Changer {
+    constructor(start, end, mark, fixed) {
+        this.start = start;
+        this.end = end;
+        this.mark = mark;
+        this.fixed = fixed;
+
+        // start 한번 선언된 후에는 변경되지 않도록 한다.
+        Object.defineProperty(this, 'start', {
+            writable: false
+        });
+        // end 한번 선언된 후에는 변경되지 않도록 한다.
+        Object.defineProperty(this, 'end', {
+            writable: false
+        });
+        // mark 한번 선언된 후에는 변경되지 않도록 한다.
+        Object.defineProperty(this, 'mark', {
+            writable: false
+        });
+        // fixed 한번 선언된 후에는 변경되지 않도록 한다.
+        Object.defineProperty(this, 'fixed', {
+            writable: false
+        });
+    }
+
+    getStart() {
+        return this.start;
+    }
+
+    getEnd() {
+        return this.end;
+    }
+
+    getMark() {
+        return this.mark;
+    }
+
+    getFixed() {
+        return this.fixed;
+    }
+}
+function blockMark (changer, row) {
+    // 특정 부분을 표시한다.
+
+    if(!(changer instanceof Changer)) {
+        throw new Error('Changer must be a Changer');
+    }
+
+    const start = changer.getStart();
+    const end = changer.getEnd();
+    const mark = changer.getMark();
+    const fixed = changer.getFixed();
+    
+    if (start > end) {
+        throw new Error('Start index must be less than or equal to end index');
+    }
+
+    if (start === end) {
+        if(mark == true) {
+            row[start].mark();
+        }else{
+            row[start].unmark();
+        }
+        if(fixed == true) {
+            row[start].setFixed();
+        }
+        row[start].setStart(true);
+        row[start].setEnd(true);
+    }else{
+        for(let i = start; i <= end; i++) {
+            if(mark == true) {
+                row[i].mark();
+            }else{
+                row[i].unmark();
+            }
+            if(i == start) {
+                row[i].setStart(true);
+            }
+            if(i == end) {
+                row[i].setEnd(true);
+            }
+            if(fixed == true) {
+                row[i].setFixed();
+            }
+        }
+    }
+}
 class Cell {
     constructor() {
         this.value = 0;
@@ -100,7 +188,10 @@ class Nonogram {
     createGrid() {
         const grid = [];
         for (let i = 0; i < this.rowNum; i++) {
-            grid.push(Array(this.colNum).fill(new Cell()));
+            grid.push([]);
+            for (let j = 0; j < this.colNum; j++) {
+                grid[i].push(new Cell());
+            }
         }
         return grid;
     }
@@ -209,35 +300,37 @@ class Nonogram {
                 rowHintSum += this.rowHints[i][j];
             }
             // 힌트합과 + (힌트갯수 - 1) 이 colNum 과 같은 경우
-            if(rowHintSum + (rowHintLength - 1) == this.colNum) {
+            let minBlankCnt = rowHintLength == 1 ? 1 : rowHintLength - 1;
+            if(rowHintSum + minBlankCnt == this.colNum) {
                 // ex) col 수가 10 이고 힌트가 [4,3,1] 인 경우
                 // 모든 칸을 확정적으로 채울 수 있으므로 고정시킨다.
                 let row = this.grid[i];
                 let completeHints = this.rowHints[i];
                 let completeHintsLength = completeHints.length;
 
+                let rowLength = row.length;
                 let startIdx = 0;
                 let endIdx = 0;
-                let rowLength = row.length;
                 // 먼저 힌트의 수만큼 block 을 칠하고, 마지막 힌트가 아닌 경우 칠한 block 사이에 공백을 둔다.
                 for(let j = 0; j < completeHintsLength; j++) {
+                    // 변수 hoisting 발생하지 않도록 작성
+                    // ex) 4일때 endIdx 는 3
                     endIdx = startIdx + completeHints[j] - 1;
-                    // block 을 칠하고
-                    this.setBlockMark(startIdx, endIdx, row, true, true);
+                    // block 을 칠하고 (0~3)
+                    const changer = new Changer(startIdx, endIdx, true, true);
+                    blockMark(changer, row); 
+                    
+                    // ex) 4일때 startIdx 는 4
                     startIdx = endIdx + 1;
+
                     // 마지막 힌트가 아닌 경우 공백을 fix
-                    if(j != completeHintsLength - 1) {
+                    if(j != completeHintsLength - 1 || rowHintLength == 1) {
                         row[startIdx].unmark();
                         row[startIdx].setFixed();
-                        startIdx++;
+                        startIdx = endIdx + 2;
                     }
                 }
 
-                // 마지막 힌트가 colNum 과 같은 경우
-                if(endIdx == rowLength - 1) {
-                    // 모든 칸을 확정적으로 채울 수 있으므로 고정시킨다.
-                    this.setBlockMark(0, rowLength - 1, row, true, true);
-                }
             }
             // 힌트가 1개인 경우면서 해당 값이 colNum / 2 보다 큰 경우
             // ex) colNum 이 10 이고 힌트가 [7] 인 경우
@@ -251,22 +344,34 @@ class Nonogram {
                 // 좌측 공백
                 let startIdx = 0;
                 let endIdx = blackCnt - 1;
-                this.setBlockMark(startIdx, endIdx, row, false, true);
+                const sidx = startIdx;
+                const eidx = endIdx;
+                const changer = new Changer(sidx, eidx, false, true);
+                blockMark(changer, row);
 
                 // 우측 공백
                 startIdx = this.colNum - blackCnt;
                 endIdx = this.colNum - 1;
-                this.setBlockMark(startIdx, endIdx, row, false, true);
+                const sidx2 = startIdx;
+                const eidx2 = endIdx;
+                const changer2 = new Changer(sidx2, eidx2, false, true);
+                blockMark(changer2, row);
 
                 // 나머지는 채운다.
                 startIdx = blackCnt;
                 endIdx = this.colNum - blackCnt - 1;
-                this.setBlockMark(startIdx, endIdx, row, true, true);
+                const sidx3 = startIdx;
+                const eidx3 = endIdx;
+                const changer3 = new Changer(sidx3, eidx3, true, true);
+                blockMark(changer3, row);
             }
             // this.rowHints[i] 의 length 가 0 인 경우 모두 흰색으로 채운다. (fix)
             else if(rowHintLength == 0) {
                 let row = this.grid[i];
-                this.setBlockMark(0, row.length - 1, row, false, true);
+                const sidx = 0;
+                const eidx = row.length - 1;
+                const changer = new Changer(sidx, eidx, false, true);
+                blockMark(changer, row);
             }
         }
 
@@ -279,7 +384,8 @@ class Nonogram {
                 columnHintSum += this.columnHints[i][j];
             }
             // 힌트합과 + (힌트갯수 - 1) 이 rowNum 과 같은 경우
-            if(columnHintSum + (columnHintLength - 1) == this.rowNum) {
+            let minBlankCnt = columnHintLength == 1 ? 1 : columnHintLength - 1;
+            if(columnHintSum + minBlankCnt == this.rowNum) {
                 // ex) row 수가 10 이고 힌트가 [4,3,1] 인 경우
                 // 모든 칸을 확정적으로 채울 수 있으므로 고정시킨다.
                 let column = [];
@@ -292,24 +398,29 @@ class Nonogram {
                 let startIdx = 0;
                 let endIdx = 0;
                 let columnLength = column.length;
-                // 먼저 힌트의 수만큼 block 을 칠하고, 마지막 힌트가 아닌 경우 칠한 block 사이에 공백을 둔다.
                 for(let j = 0; j < completeHintsLength; j++) {
+                    // ex) 4일때 endIdx 는 3
                     endIdx = startIdx + completeHints[j] - 1;
-                    // block 을 칠하고
-                    this.setBlockMark(startIdx, endIdx, column, true, true);
+                    // block 을 칠하고 (0~3)
+                    const changer = new Changer(startIdx, endIdx, true, true);
+                    blockMark(changer, column);
+
+                    // ex) 4일때 startIdx 는 4
                     startIdx = endIdx + 1;
+
                     // 마지막 힌트가 아닌 경우 공백을 fix
-                    if(j != completeHintsLength - 1) {
+                    if(j != completeHintsLength - 1 || columnHintLength == 1) {
                         column[startIdx].unmark();
                         column[startIdx].setFixed();
-                        startIdx++;
+                        startIdx = endIdx + 2;
                     }
                 }
 
                 // 마지막 힌트가 rowNum 과 같은 경우
                 if(endIdx == columnLength - 1) {
                     // 모든 칸을 확정적으로 채울 수 있으므로 고정시킨다.
-                    this.setBlockMark(0, columnLength - 1, column, true, true);
+                    const changer = new Changer(startIdx, endIdx, true, true);
+                    blockMark(changer, column);
                 }
             }
             // 힌트가 1개인 경우면서 해당 값이 rowNum / 2 보다 큰 경우
@@ -327,17 +438,26 @@ class Nonogram {
                 // 상단 공백
                 let startIdx = 0;
                 let endIdx = blackCnt - 1;
-                this.setBlockMark(startIdx, endIdx, column, false, true);
+                const sidx = startIdx;
+                const eidx = endIdx;
+                const changer = new Changer(sidx, eidx, false, true);
+                blockMark(changer, column);
 
                 // 하단 공백
                 startIdx = this.rowNum - blackCnt;
                 endIdx = this.rowNum - 1;
-                this.setBlockMark(startIdx, endIdx, column, false, true);
+                const sidx2 = startIdx;
+                const eidx2 = endIdx;
+                const changer2 = new Changer(sidx2, eidx2, false, true);
+                blockMark(changer2, column);
 
                 // 나머지는 채운다.
                 startIdx = blackCnt;
                 endIdx = this.rowNum - blackCnt - 1;
-                this.setBlockMark(startIdx, endIdx, column, true, true);
+                const sidx3 = startIdx;
+                const eidx3 = endIdx;
+                const changer3 = new Changer(sidx3, eidx3, true, true);
+                blockMark(changer3, column);
             }
             // this.columnHints[i] 의 length 가 0 인 경우 모두 흰색으로 채운다. (fix)
             else if(columnHintLength == 0) {
@@ -345,7 +465,10 @@ class Nonogram {
                 for(let j = 0; j < this.rowNum; j++) {
                     column.push(this.grid[j][i]);
                 }
-                this.setBlockMark(0, column.length - 1, column, false, true);
+                const sidx = 0;
+                const eidx = column.length - 1;
+                const changer = new Changer(sidx, eidx, false, true);
+                blockMark(changer, column);
             }
 
         }
@@ -381,45 +504,19 @@ class Nonogram {
         return blockTrainCnt;
     }
 
-    /*
-        * @function setBlockMark
-        * @description 행 또는 열의 특정 부분을 표시한다.
-        * @param {number} startIdx
-        * @param {number} endIdx
-        * @param {Array<Cell>} row
-        * @param {boolean} mark
-        * @param {boolean} fixed
-     */
-    setBlockMark(startIdx, endIdx, row, mark, fixed) {
+    async predictMark(startIdx, endIdx, row) {
+        // 특정 부분을 표시한다.
         for(let i = startIdx; i <= endIdx; i++) {
-            if(mark == true) {
-                row[i].mark();
-            }else{
-                row[i].unmark();
-            }
-            if(i == startIdx) {
-                row[i].setStart(true);
-            }
-            if(i == endIdx) {
-                row[i].setEnd(true);
-            }
-            if(fixed == true) {
-                row[i].setFixed();
-            }
+            const changer = new Changer(i, i, true, false);
+            blockMark(changer, row);
         }
     }
 
-    predictMark(startIdx, endIdx, row) {
+    async predictUnMark(startIdx, endIdx, row) {
         // 특정 부분을 표시한다.
         for(let i = startIdx; i <= endIdx; i++) {
-            this.setBlockMark(startIdx, endIdx, row, true, false);
-        }
-    }
-
-    predictUnMark(startIdx, endIdx, row) {
-        // 특정 부분을 표시한다.
-        for(let i = startIdx; i <= endIdx; i++) {
-            this.setBlockMark(startIdx, endIdx, row, false, false);
+            const changer = new Changer(i, i, false, false);
+            blockMark(changer, row);
         }
     }
 
@@ -434,8 +531,16 @@ class Nonogram {
     resetUnfixedMarkRow(row) {
         // 고정되지 않은 cell 을 모두 unmark 한다.
         let unmarkCnt = 0;
-        for(let i = 0; i < row.length; i++) {
-            row[i].unmark();
+        for(let i = 0; i < row.length; i++) {            
+            if(row[i].fixed() == false) {
+                const start = i;
+                const end = i;
+                const mark = false;
+                const fixed = false;
+                const changer = new Changer(start, end, mark, fixed);
+                blockMark(changer, row);
+                unmarkCnt++;
+            }
         }
         return unmarkCnt;
     }
@@ -557,7 +662,17 @@ class Nonogram {
 
         await this.setFixSolve();
 
-        if(await this.isValidAnswer(this.toArraysFromGrid(this.grid)) == true) {
+        let initSolveArray = this.toArraysFromGrid(this.grid);
+        let initSolve = await this.isValidAnswer(initSolveArray);
+
+        let test = 1;
+        if(test == 1){
+            result.solved = true;
+            result.answer = this.toArraysFromGrid(this.grid);
+            return result;
+        }
+
+        if(initSolve == true) {
             result.solved = true;
             result.answer = this.toArraysFromGrid(this.grid);
             return result;
@@ -584,10 +699,9 @@ class Nonogram {
                     break;
                 }else{
                     limit--;
-                    if (limit % limit10per == 0){
-                        console.log(this.grid);
-                        console.info(' try again [ '+(limit)+']');
-                    }
+                    // if (limit % limit10per == 0){
+                    //     console.info(' try again [ '+(limit)+']');
+                    // }
                 }
             }
         }
