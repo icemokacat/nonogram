@@ -65,20 +65,12 @@ async function blockMark (changer, row) {
         if(fixed == true) {
             row[start].setFixed();
         }
-        row[start].setStart(true);
-        row[start].setEnd(true);
     }else{
         for(let i = start; i <= end; i++) {
             if(mark == true) {
                 row[i].mark();
             }else{
                 row[i].unmark();
-            }
-            if(i == start) {
-                row[i].setStart(true);
-            }
-            if(i == end) {
-                row[i].setEnd(true);
             }
             if(fixed == true) {
                 row[i].setFixed();
@@ -87,28 +79,64 @@ async function blockMark (changer, row) {
     }
 }
 class Cell {
-    constructor() {
+    constructor(first, last) {
         this.value = 0;
         this.isFixed = false;
         this.isMarked = false;
-        this.start = false;
-        this.end = false;
+
+        this.first = false;
+        this.last = false;
+
+        if(first) {
+            this.first = true;
+            // 수정 불가
+            Object.defineProperty(this, 'first', {
+                writable: false
+            });
+        }
+        if(last) {
+            this.last = true;
+            // 수정 불가
+            Object.defineProperty(this, 'last', {
+                writable: false
+            });
+        }        
     }
 
-    setStart(flag) {
-        this.start = flag;
+    first() {
+        return this.first;
     }
 
-    isStart() {
-        return this.start;
+    last() {
+        return this.last;
     }
 
-    setEnd(flag) {
-        this.end = flag;
+    setPrevCell(cell) {
+        this.prevCell = cell;
+        if(cell != null) {
+            // 수정 불가
+            Object.defineProperty(this, 'prevCell', {
+                writable: false
+            });
+        }
     }
 
-    isEnd() {
-        return this.end;
+    setNextCell(cell) {
+        this.nextCell = cell;
+        if(cell != null) {
+            // 수정 불가
+            Object.defineProperty(this, 'nextCell', {
+                writable: false
+            });
+        }
+    }
+
+    getPrevCell() {
+        return this.prevCell;
+    }
+
+    getNextCell() {
+        return this.nextCell;
     }
 
     getValue() {
@@ -193,64 +221,35 @@ class Nonogram {
         const grid = [];
         for (let i = 0; i < this.rowNum; i++) {
             grid.push([]);
+            // 우선 모든 cell 을 생성한다.
             for (let j = 0; j < this.colNum; j++) {
-                grid[i].push(new Cell());
+                const first = j === 0;
+                const last = j === this.colNum - 1;
+                const cell = new Cell(first, last);
+                grid[i].push(cell);
+            }
+        }
+        // 모든 cell 에 prevCell, nextCell 을 설정한다.
+        for (let i = 0; i < this.rowNum; i++) {
+            for (let j = 0; j < this.colNum; j++) {
+                const cell = grid[i][j];
+                if (j === 0) {
+                    cell.setPrevCell(null);
+                } else {
+                    cell.setPrevCell(grid[i][j - 1]);
+                }
+                if (j === this.colNum - 1) {
+                    cell.setNextCell(null);
+                } else {
+                    cell.setNextCell(grid[i][j + 1]);
+                }
             }
         }
         return grid;
-    }
-
-    async cloneDeep(obj) {
-        // obj is array<array<Cell>>
-        const objCopy = [];
-        for (let i = 0; i < obj.length; i++) {
-            objCopy.push([]);
-            for (let j = 0; j < obj[i].length; j++) {
-                const isFixed = obj[i][j].fixed();
-                const isMarked = obj[i][j].getMarked();
-                const start = obj[i][j].isStart();
-                const end = obj[i][j].isEnd();
-                const cell = new Cell();
-                if(isMarked){
-                    cell.mark();
-                }else{
-                    cell.unmark();
-                }
-                if(isFixed){
-                    cell.setFixed();
-                }
-                if(start){
-                    cell.setStart(true);
-                }
-                if(end){
-                    cell.setEnd(true);
-                }
-                objCopy[i].push(cell);
-            }
-        }
-        return objCopy;
     }
 
     getGrid() {
         return this.grid;
-    }
-
-    /*
-        * @function toArraysFromGrid
-        * @description Converts grid to array
-        * @param {Array<Array<Cell>>} grid
-        * @returns {Array<Array<number>>}
-     */
-    async toArraysFromGrid(gridArrays) {
-        const gridObjArraysCopy = await this.cloneDeep(gridArrays);
-        const grid = [];
-        for (let i = 0; i < this.rowNum; i++) {
-            grid.push([]);
-            for (let j = 0; j < this.colNum; j++) {
-                grid[i].push(gridObjArraysCopy[i][j].getValue());
-            }
-        }
-        return grid;
     }
 
     async isValidHints() {
@@ -588,10 +587,6 @@ class Nonogram {
 
         for(let i = 0; i < rowHintsLength; i++) {
             let hintValue = rowHints[i];
-            // 범위를 넘지 않도록 한다
-            if(startIdx + hintValue - 1 > rowLength - 1) {
-                break;
-            }
             let randomStartIdx = Math.floor(Math.random() * rowLength);
             let randomEndIdx = randomStartIdx + hintValue - 1;
             const changer = new Changer(randomStartIdx, randomEndIdx, true, false);
@@ -611,17 +606,26 @@ class Nonogram {
                 // 해당 행이 모두 확정된 경우 pass
                 continue;
             }
-            const hintCnt = this.rowHints[i].length;
-            let trainCnt = await this.getBlockTrainCnt(this.grid[i]);
+            const idx = i;
+            const hintCnt = this.rowHints[idx].length;
+            if(hintCnt == 0) {
+                // 힌트가 없는 경우 모두 흰색으로 채워야 한다.
+                const sidx = 0;
+                const eidx = this.grid[idx].length - 1;
+                const changer = new Changer(sidx, eidx, false, true);
+                blockMark(changer, this.grid[idx]);
+                continue;
+            }
+            let trainCnt = await this.getBlockTrainCnt(this.grid[idx]);
 
             // block 의 갯수가 다른 경우 같아 질때 까지 랜덤하게 채운다. (힌트의 갯수 와 연속되게 칠해진 block 의 갯수)
             if(hintCnt != trainCnt) {
-                await this.setHintRandomeMark(this.grid[i], this.rowHints[i]);
+                await this.setHintRandomeMark(this.grid[idx], this.rowHints[idx]);
             }
 
             let ran = 0;
             while(hintCnt != trainCnt) {
-                trainCnt = await this.getBlockTrainCnt(this.grid[i]);
+                trainCnt = await this.getBlockTrainCnt(this.grid[idx]);
                 if(hintCnt == trainCnt ) {
                     break;
                 }
@@ -630,44 +634,8 @@ class Nonogram {
                     console.warn('too many random loop in row');
                     break;
                 }
-                this.resetUnfixedMarkRow(this.grid[i]);
-                await this.setHintRandomeMark(this.grid[i], this.rowHints[i]);
-            }
-        }
-
-        // 열 힌트를 기준으로 열을 채운다.
-        let gridColCnt = this.grid[0].length;
-        for (let i = 0; i < gridColCnt; i++) {
-            let column = [];
-            for(let j = 0; j < this.rowNum; j++) {
-                column.push(this.grid[j][i]);
-            }
-            let allFixRow = this.isAllFixed(column);
-            if(allFixRow == true) {
-                // 해당 행이 모두 확정된 경우 pass
-                continue;
-            }
-            const hintCnt = this.columnHints[i].length;
-            let trainCnt = await this.getBlockTrainCnt(column);
-
-            // block 의 갯수가 다른 경우 같아 질때 까지 랜덤하게 채운다. (힌트의 갯수 와 연속되게 칠해진 block 의 갯수)
-            if(hintCnt != trainCnt) {
-                await this.setHintRandomeMark(column, this.columnHints[i]);
-            }
-
-            let ran = 0;
-            while(hintCnt != trainCnt) {
-                trainCnt = await this.getBlockTrainCnt(column);
-                if(hintCnt == trainCnt) {
-                    break;
-                }
-                ran++;
-                if(ran > limitRandom) {
-                    console.warn('too many random loop in column');
-                    break;
-                }
-                this.resetUnfixedMarkRow(column);
-                await this.setHintRandomeMark(column, this.columnHints[i]);
+                this.resetUnfixedMarkRow(this.grid[idx]);
+                await this.setHintRandomeMark(this.grid[idx], this.rowHints[idx]);
             }
         }
 
@@ -686,7 +654,6 @@ class Nonogram {
 
         if(initSolve == true) {
             result.solved = true;
-            result.answer = await this.toArraysFromGrid(this.grid);
             return result;
         }else{
             console.log('initSolve fail...')
@@ -701,7 +668,6 @@ class Nonogram {
             if(limit < 0) {
                 console.info('too many loop solve');
                 result.solved = false;
-                result.answer = await this.toArraysFromGrid(this.grid);
                 break;
             }else{
                 this.resetUnfixedMark();
@@ -709,8 +675,7 @@ class Nonogram {
                 result.solved = await this.isValidGrid();
                 
                 if(result.solved == true) {
-                    result.answer = await this.toArraysFromGrid(this.grid);
-                    console.info(' solved in ['+(1000000 - limit)+']');                    
+                    console.info(' solved by try ['+tryCnt+']');
                     break;
                 }else{
                     limit--;
@@ -736,7 +701,6 @@ class Nonogram {
             let rowHints = this.rowHints[i];
             let rowCheck = await this.checkGrid(row, rowHints);
             if(rowCheck != true) {
-                console.log('rowCheck ['+(i+1)+'번째] fail')
                 return false;
             }
         }
@@ -749,7 +713,6 @@ class Nonogram {
             let columnHints = this.columnHints[i];
             let columnCheck = await this.checkGrid(column, columnHints);
             if(columnCheck != true) {
-                console.log('columnCheck ['+(i+1)+'번째] fail')
                 return false;
             }
         }
@@ -925,11 +888,17 @@ const nonoFinder = {
 
         // If solved, return the answer
         if (solveResponse.solved) {
+            // 초록색으로 로그 표시
+            console.log('%c solved', 'color: green; font-weight: bold;');
             result.solved = true;
             result.answer = solveResponse.answer;
+            result.grid = nonogram.getGrid();
         } else {
+            // 빨간색으로 로그 표시
+            console.log('%c not solved', 'color: red; font-weight: bold;');
             result.solved = false;
             result.answer = solveResponse.answer;
+            result.grid = nonogram.getGrid();
         }
         return result;
     }

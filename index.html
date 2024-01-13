@@ -202,22 +202,22 @@
                 // valid hint
                 if (result.valid === false) {
                     const msg = result.notValidReason;
-                    alert(msg);
+                    console.warn(msg);
+                    alert('유효하지 않은 힌트입니다.');
                     return;
                 }else{
                     // if can't find answer 
                     if (result.solved === false) {
-                        console.error('can\'t find answer');
+                        game.style.border = '1px solid red';
+                        alert('해답을 찾을 수 없습니다.');
                         // 일단 틀려도 그려보자
-                        drawByAnswer(result.answer);
-                        return;
+                        drawByAnswer(result.grid);
                     }else{
                         // draw answer
                         // 성공시 .game 의 border 를 1px solid blue 로 변경
                         const game = document.querySelector('.game');
                         game.style.border = '1px solid blue';
-                        const answer = result.answer;
-                        drawByAnswer(answer);    
+                        drawByAnswer(result.grid);    
                     } 
                 }
                 
@@ -274,41 +274,31 @@
         * @param {Array.<Array.<Number>>} array
         * @return void : draw game
         */
-        function drawByAnswer(answer){
+        function drawByAnswer(grid){
             // array 는 2차원 배열이다.
             // 행 기준으로 아래로 돌면서 그린다.
-            if (answer === undefined || answer.length === 0) {
+            if (grid === undefined || grid.length === 0) {
                 console.warn('answer is undefined or empty');
                 return;
             }
-            // 검증 array 의 모든 값이 숫자 여야 한다.
-            if (answer.some(row => row.some(col => typeof col !== 'number'))) {
-                console.warn('answer must be number array');
-                return;
-            }
             // create 한 board 의 row 수와 answer 의 row 수가 같아야 한다.
-            if (answer.length !== rows) {
-                console.warn('answer row length '+answer.length+' is not equal to board row length');
+            if (grid.length !== rows) {
+                console.warn('answer row length '+grid.length+' is not equal to board row length');
                 return;
-            }else{
-                // create 한 board 의 col 수와 answer 의 col 수가 같아야 한다.
-                const gameRowContainer = document.querySelectorAll('.game-row-container');
-                gameRowContainer.forEach(function(item,index){
-                    const gameRow = item.querySelector('.game-row');
-                    if(gameRow.childNodes.length !== answer[index].length){
-                        console.warn('answer col length is not valid');
-                        return;
-                    }
-                });
             }
-            const gameRowContainer = document.querySelectorAll('.game-row-container');
-            // 1 이면 active, 0 이면 nothing
-            for(let i = 0; i < answer.length; i++){
-                const gameRow = gameRowContainer[i].querySelector('.game-row');
-                for(let j = 0; j < answer[i].length; j++){
-                    if(answer[i][j] === 1){
-                        gameRow.childNodes[j].classList.add('active');
+            const gridRowCnt = grid.length;
+            
+            for(let i = 0; i < gridRowCnt; i++){
+                const gridColCnt = grid[i].length;
+                for(let j = 0; j < gridColCnt; j++){
+                    const gameCell = findGameCell(i, j);
+                    if(grid[i][j].getMarked() === true){
+                        gameCell.classList.add('active');
+                    }else{
+                        gameCell.classList.remove('active');
                     }
+                    const fixed = grid[i][j].fixed();
+                    gameCell.setAttribute('data-fixed', fixed);
                 }
             }
         }
@@ -355,6 +345,14 @@
 
             const rownumber = rownumberObj.value;
             rows = Number(rownumber);
+            if(rownumber === ''){
+                alert('row number is empty');
+                return;
+            }
+            if(rownumber < 3){
+                alert('크기는 3이상 설정해주세요');
+                return;
+            }
             const game = document.querySelector('.game');
 
             // create row
@@ -364,6 +362,21 @@
 
             // create col hints
             createColHints();
+        }
+
+        function findGameCell(row, col){
+            // name 이 'game-cell' 인 span 을 찾아서 반환
+            const gameCell = document.querySelectorAll('.game-cell');
+            const findR = Number(row);
+            const findC = Number(col);
+            for(let i = 0; i < gameCell.length; i++){
+                const thisR = Number(gameCell[i].getAttribute('data-row-index'));
+                const thisC = Number(gameCell[i].getAttribute('data-col-index'));
+                if(thisR === findR && thisC === findC){
+                    return gameCell[i];
+                }
+            }
+            return null;
         }
 
         function createRow(index, cellnum){
@@ -379,7 +392,9 @@
             for(let i = 0; i < cellnum; i++){
                 const gameCell = document.createElement('span');
                 gameCell.classList.add('game-cell');
-                gameCell.setAttribute('data-index', i);
+                gameCell.setAttribute('name', 'game-cell');
+                gameCell.setAttribute('data-row-index', index);
+                gameCell.setAttribute('data-col-index', i);
                 gameRow.appendChild(gameCell);
             }
 
