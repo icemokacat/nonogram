@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nonogram Find Answer</title>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        body{
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            width: 1200px;
+            height: 800px;
+            margin: 0 auto;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .game-contents{
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .game-header{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .func-container{
+            height: 80px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+        }
+        .func-wrapper{
+            display: block;
+        }
+        .game{
+            margin: 20px;
+            padding: 4px;
+            border: 2px solid;
+            border-color: blueviolet;
+            height: auto;
+            display: grid;
+        }
+        .game-row-container{
+            display: flex;
+            flex-direction: row;
+            height: 24px;
+            width: 100%;
+        }
+        .game-row{
+            height: 22px;
+            width: fit-content;
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            margin: 0;
+            padding: 0;
+        }
+        .game-cell{
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            margin: 0;
+            margin-right: 2px;
+            border: 1px solid #73736c;
+        }
+        .active{
+            background-color: #000;
+        }
+        .game-col-hint{
+            display: flex;
+            flex-direction: row;
+            justify-content: flex-start;
+            margin: 0;
+            padding: 0;
+            border-top: 1px solid saddlebrown;
+            margin-top: 4px;
+            padding-top: 4px;
+        }
+        .hint-col-container{
+            width: 22px;
+            display: inline-block;
+            margin-right: 2px;
+        }
+        .hint-col-container .plus{
+            margin-top: 4px;
+        }
+        .hint-row-container{
+            height: 22px;
+            display: flex;
+            flex-direction: row;
+
+            border-left: 1px solid saddlebrown;
+            margin-left: 4px;
+            padding-left: 4px;
+        }
+        .hint-row-container .plus{
+            margin-left: 4px;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .hint{
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            margin-right: 2px;
+            margin: 0;
+            padding: 0;
+            margin-right: 2px;
+            border: 1px solid #0922ff;
+            text-align: center;
+            user-select: none;
+        }
+        button.plus{
+            display: inline-block;
+            width: 22px;
+            height: 22px;
+            margin: 0;
+            padding: 0;
+            border: 1px solid beige;
+        }
+        button.plus:hover{
+            background-color: #000;
+            color: #fff;
+            cursor: pointer;
+        }
+        #rownumber{
+            height: 24px;
+            border: none;
+            background: none;
+            border-bottom: 1px solid #969696;
+            color: #646464;
+
+            -webkit-box-shadow: none;
+            -webkit-appearance: none;
+            -webkit-border-radius: 0;
+
+            outline: none;
+        }
+        .btn{
+            width: 130px;
+            height: 40px;
+            padding: 10px 0px;
+            border: 2px solid #000;
+            font-family: 'Lato', sans-serif;
+            font-weight: 500;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            display: inline-block;
+
+            background: #000;
+            color: #fff;
+            z-index: 1;
+        }
+        .btn:after {
+            position: absolute;
+            content: "";
+            width: 0;
+            height: 100%;
+            top: 0;
+            right: 0;
+            z-index: -1;
+            background: #e0e5ec;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            color: #000;
+        }
+        .btn:hover:after {
+            left: 0;
+            width: 100%;
+        }
+        .btn:active {
+            top: 2px;
+        }
+
+        @media screen and (max-width: 768px){
+            .func-container{
+                height: 200px;
+            }
+            .func-wrapper{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            .btn{
+                line-height: 2px;
+                margin-top: 10px;
+                height: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="game-header">
+            <p>Nonogram Find Answer</p>
+        </div>
+        <div class="func-container">
+            <div class="func-wrapper">
+                <input type="number" id="rownumber" placeholder="row">
+                <button class="btn" id="create-board">Create Game</button>
+                <button class="btn" id="find-answer">Draw!</button>
+                <button class="btn" id="reset">Reset</button>
+
+                <button class="btn" id="remove">Remove Hints</button>
+                <button class="btn" id="save">Save</button>
+            </div>
+        </div>
+        <div class="game-contents">            
+            <div class="game">
+
+                <!-- <div class="game-row-hint">
+                    <input type="number" class="hint" name="hint-row">
+                    <button>+</button>
+                </div> -->
+
+                <!-- example game -->
+                <div class="game-row-container">
+                    <div class="game-row">
+                        <span class="game-cell active"></span>
+                        <span class="game-cell active"></span>
+                        <span class="game-cell active"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell active"></span>
+                    </div>
+                    <div class="hint-row-container">
+                        <input type="number" class="hint" name="hint-row">
+                        <button class="plus">+</button>
+                    </div>
+                </div>
+                <div class="game-row-container">
+                    <div class="game-row">
+                        <span class="game-cell active"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                    </div>
+                    <div class="hint-row-container">
+                        <input type="number" class="hint" name="hint-row">
+                        <button class="plus">+</button>
+                    </div>
+                </div>
+                <div class="game-row-container">
+                    <div class="game-row">
+                        <span class="game-cell active"></span>
+                        <span class="game-cell active"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                    </div>
+                    <div class="hint-row-container">
+                        <input type="number" class="hint" name="hint-row">
+                        <button class="plus">+</button>
+                    </div>
+                </div>
+                <div class="game-row-container">
+                    <div class="game-row">
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell"></span>
+                    </div>
+                    <div class="hint-row-container">
+                        <input type="number" class="hint" name="hint-row">
+                        <button class="plus">+</button>
+                    </div>
+                </div>
+                <div class="game-row-container">
+                    <div class="game-row">
+                        <span class="game-cell active"></span>
+                        <span class="game-cell active"></span>
+                        <span class="game-cell"></span>
+                        <span class="game-cell active"></span>
+                        <span class="game-cell"></span>
+                    </div>
+                    <div class="hint-row-container">
+                        <input type="number" class="hint" name="hint-row">
+                        <button class="plus">+</button>
+                    </div>
+                </div>
+                <div class="game-col-hint">
+                    <div class="hint-col-container">
+                        <input type="number" class="hint" name="hint-col">
+                        <button class="plus">+</button>
+                    </div>
+                    <div class="hint-col-container">
+                        <input type="number" class="hint" name="hint-col">
+                        <button class="plus">+</button>
+                    </div>
+                    <div class="hint-col-container">
+                        <input type="number" class="hint" name="hint-col">
+                        <button class="plus">+</button>
+                    </div>
+                    <div class="hint-col-container">
+                        <input type="number" class="hint" name="hint-col">
+                        <button class="plus">+</button>
+                    </div>
+                    <div class="hint-col-container">
+                        <input type="number" class="hint" name="hint-col">
+                        <button class="plus">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        const rownumberObj = document.querySelector('#rownumber');
+
+        const createBoardBtn = document.querySelector('#create-board');
+        const findAnswerBtn = document.querySelector('#find-answer');
+        const resetBtn = document.querySelector('#reset');
+        const removeBtn = document.querySelector('#remove');
+        const saveBtn = document.querySelector('#save');
+
+        let rowblocks = [];
+        let colblocks = [];
+        let tempCopyCols = [];
+
+        createBoardBtn.addEventListener('click', createBoard);
+        findAnswerBtn.addEventListener('click', findAnswer);
+        resetBtn.addEventListener('click', reset);
+        removeBtn.addEventListener('click', removeHints);
+        saveBtn.addEventListener('click', save);
+
+        // .game drag -> toggle block
+        document.addEventListener('mousedown', function(e){
+            const target = e.target;
+            if(target.classList.contains('game-cell')){
+                toggleBlock(target);
+            }
+        });
+
+        function test(){
+            let testArr = [
+                [1,1,0,0,1],
+                [1,1,0,0,1],
+                [1,1,0,0,1],
+                [0,0,0,0,1],
+                [1,1,1,0,1]
+            ];
+            let answer = [
+                [1,1,1,0,1],
+                [1,1,1,0,1],
+                [0,0,0,0,1],
+                [0,0,0,0,0],
+                [1,1,1,1,1]
+            ];
+            let changed = changeCols(testArr);
+            if(JSON.stringify(answer) === JSON.stringify(changed)){
+                console.log('same');
+            }else{
+                console.log('different');
+                console.log(answer);
+                console.log(changed);
+            }
+        }
+        function changeCols(arr){
+            let result = [];
+            let temp = [];
+            for(let i = 0; i < arr.length; i++){
+                for(let j = 0; j < arr[i].length; j++){
+                    temp.push(arr[j][i]);
+                }
+                result.push(temp);
+                temp = [];
+            }
+            return result;
+        }
+
+        function toggleBlock(dom){
+            if(dom.classList.contains('active')){
+                dom.classList.remove('active');
+            }else{
+                dom.classList.add('active');
+            }
+        }
+
+        function blockReset(){
+            rowblocks = [];
+            colblocks = [];
+            const gameCell = document.querySelectorAll('.game-cell');
+            gameCell.forEach(function(item){
+                item.classList.remove('active');
+            });
+        }
+
+        function findAnswer (){
+            blockReset();
+            // 먼저 hint 의 합이 rownumber 과 같거나 작은지 확인한다.
+            const rownumber = rownumberObj.value;
+            // 이때 row 를 돌면서 각각 확인 한다.
+            const gameRowContainer = document.querySelectorAll('.game-row-container');
+
+            let rowHints = [];
+            let colHints = [];
+
+            // 1. row 확인
+            gameRowContainer.forEach(function(item){
+                const hintRowContainer = item.querySelector('.hint-row-container');
+                const hintRow = hintRowContainer.querySelectorAll('.hint');
+                let hintRowSum = 0;
+                let hintRowArray = [];
+                hintRow.forEach(function(item){
+                    hintRowSum += parseInt(item.value) + 1;
+                    hintRowArray.push(parseInt(item.value));
+                });
+                rowHints.push(hintRowArray);
+                // 마지막에는 -1 을 빼준다.
+                hintRowSum -= 1;
+
+                // rownumber 보다 작거나 같은지 확인한다.
+                if(hintRowSum > rownumber){
+                    // 해당 index 의 모든 hint input 테두리를 빨간색으로 바꾼다.
+                    hintRow.forEach(function(item){
+                        item.style.border = '2px solid red';
+                    });
+                    // 그리고 불가능 선언후 리턴한다.
+                    alert('해당 row 의 hint 의 합이 rownumber 보다 큽니다.');
+                    return;
+                }
+            });
+
+            // 2. col 확인
+            const gameColHint = document.querySelector('.game-col-hint');
+            gameColHint.childNodes.forEach(function(item){
+                if(item.classList.contains('hint-col-container')){
+                    // hind 의 합을 구한다.
+                    const hintCol = item.querySelectorAll('.hint');
+                    let hintColSum = 0;
+                    let hintColArray = [];
+                    hintCol.forEach(function(item){
+                        hintColSum += parseInt(item.value) + 1;
+                        hintColArray.push(parseInt(item.value));
+                    });
+                    colHints.push(hintColArray);
+
+                    // 마지막에는 -1 을 빼준다.
+                    hintColSum -= 1;
+
+                    // rownumber 보다 작거나 같은지 확인한다.
+                    if(hintColSum > rownumber){
+                        // 해당 index 의 모든 hint input 테두리를 빨간색으로 바꾼다.
+                        hintCol.forEach(function(item){
+                            item.style.border = '2px solid red';
+                        });
+                        // 그리고 불가능 선언후 리턴한다.
+                        alert('해당 col 의 hint 의 합이 rownumber 보다 큽니다.');
+                        return;
+                    }
+                }
+            });
+
+            // 3. 먼저 전달 받은 hints 로 블럭을 만든다.
+            drawByHints(rowHints, 'row');
+
+            // 4. col 의 hints 로 블럭을 만든다.
+            drawByHints(colHints, 'col');
+
+            // 5. 첫번째 확인
+            if(checkValidHints() === false){
+                alert('힌트가 불가능합니다.');
+                return;
+            }
+        }
+
+        function checkValidHints(){
+            // 만들어 놓은 rowblocks 와 colblocks 를 이용하여
+            // 해당 힌트가 가능한지 확인한다.
+
+            // 1. rowblocks 를 돌면서 각각의 합을 구한다.
+            let rowblocksSum = 0;
+            rowblocks.forEach(function(item){
+                let sum = 0;
+                item.forEach(function(item){
+                    sum += item;
+                });
+                rowblocksSum += sum;
+            });
+            // 2. colblocks 를 돌면서 각각의 합을 구한다.
+            let colblocksSum = 0;
+            colblocks.forEach(function(item){
+                let sum = 0;
+                item.forEach(function(item){
+                    sum += item;
+                });
+                colblocksSum += sum;
+            });
+
+            // 3. rowblocksSum 과 colblocksSum 이 같은지 확인한다.
+            if(rowblocksSum !== colblocksSum){
+                return false;
+            }
+
+            // 4. rowblocks 와 colblocks 이 완벽히 같은지 확인한다.
+            return itsSuccess();
+        }
+
+        function itsSuccess(){
+            // 이때 colblocks 는 rowblocks 의 반대로 만들어야 한다.
+            // 먼저 복사를 한다.
+            let colblocksCopy = changeCols(colblocks);          
+            
+            if(JSON.stringify(rowblocks) === JSON.stringify(colblocksCopy)){
+                return true;
+            }else{
+                return false;
+            }
+        }
+
+        function drawByHints(array, drawType){
+            // array 는 2차원 배열이다.
+            // 1. 먼저 row 를 돌면서 각각의 hint 에 맞게 블럭을 그린다.
+            let count = 0;
+            if('row' === drawType){
+                const gameRowContainer = document.querySelectorAll('.game-row-container');
+                gameRowContainer.forEach(function(item,index){
+                    let pointer = 0;
+                    const gameRow = item.querySelector('.game-row');
+                    let rowArray = array[index];
+                    if(rowblocks[index] === undefined){
+                        rowblocks[index] = [];
+                    }
+                    rowArray.forEach(function(item){
+                        for(let i = 0; i < item; i++){
+                            const gameCell = gameRow.childNodes[pointer];
+                            gameCell.classList.add('active');
+                            pointer++;
+                            // rowblocks 해당 위치에 1을 넣는다.                            
+                            rowblocks[index].push(1);
+                            // 마지막 블럭이라면 0을 넣는다. 
+                            if(i === item - 1){
+                                rowblocks[index].push(0);
+                            }
+                        }
+                        pointer++;
+                    });
+                    // 마지막 블럭 0을 제거한다.
+                    rowblocks[index].pop();
+                    // 나머지 블럭은 0으로 채운다.
+                    let currentLength = rowblocks[index].length;
+                    let rowLength = gameRow.childNodes.length;
+                    for(let i = currentLength; i < rowLength; i++){
+                        rowblocks[index].push(0);
+                    }
+                })
+            }else{
+                // col 일때는 배열만 만들어 놓는다.
+                const gameColHint = document.querySelector('.game-col-hint');
+                gameColHint.childNodes.forEach(function(item){
+                    if(item.classList.contains('hint-col-container')){
+                        let colArray = array[count];
+                        if(colblocks[count] === undefined){
+                            colblocks[count] = [];
+                        }
+                        colArray.forEach(function(item){
+                            for(let i = 0; i < item; i++){
+                                // colblocks 해당 위치에 1을 넣는다.
+                                colblocks[count].push(1);
+                                // 마지막 블럭이라면 0을 넣는다.
+                                if(i === item - 1){
+                                    colblocks[count].push(0);
+                                }
+                            }
+                        });
+                        // 마지막 블럭 0을 제거한다.
+                        colblocks[count].pop();
+                        // 나머지 블럭은 0으로 채운다.
+                        let currentLength = colblocks[count].length;
+                        let colLength = gameColHint.childNodes.length;
+                        for(let i = currentLength; i < colLength; i++){
+                            colblocks[count].push(0);
+                        }
+                        count++;
+                    }
+                });
+            }
+        }
+
+        function pushArray(array, index, direction){
+
+            const result = {}
+            let available = false;
+
+            // 이제 arrayCopy 로만 이동을 먼저 시킨 후 정상이면 array 에 복사한다.
+            let arrayCopy = array.slice();
+
+            // 1. 먼저 0만 존재하거나 1만 존재하는 경우는 묶음이 없으므로
+            // 체크 후 바로 리턴한다.
+            if(arrayCopy.indexOf(0) === -1 || arrayCopy.indexOf(1) === -1){
+                return {
+                    result: arrayCopy,
+                    available: false
+                }
+            }
+
+            // 2. 묶음의 갯수를 구한다.
+            let trainCount = 0;
+            let trains = [];
+
+            let findToggle = false;
+            let tempTrain = [];
+            let startTrainIndex = 0;
+            let findCount = 0;
+            for(let i = 0; i < array.length; i++){
+                if(array[i] === 1){
+                    tempTrain.push(array[i]);
+                    if(findToggle === false){
+                        findToggle = true;
+                        trainCount++;
+                        findCount++;
+                        if(findCount === index + 1){
+                            startTrainIndex = i;
+                        }
+                    }
+                }else{
+                    trains.push(tempTrain);
+                    tempTrain = [];
+                    findToggle = false;
+                }
+            }
+
+            // 3. 이동 시키고자 하는 묶음의 길이를 구한다.
+            let trainLength = trains[index].length;
+
+            // 4. 방향에 따라서 묶음을 이동시킨다.
+            let switchResult = switchNum(arrayCopy, startTrainIndex, trainLength, direction);
+            if(switchResult.available === true){
+                available = true;
+                arrayCopy = switchResult.result;
+            }
+
+            // 5. 묶음의 갯수가 달라 졌는지 확인한다.
+            let trainCount2 = 0;
+            let findToggle2 = false;
+
+            for(let i = 0; i < arrayCopy.length; i++){
+                if(arrayCopy[i] === 1){
+                    if(findToggle2 === false){
+                        findToggle2 = true;
+                        trainCount2++;
+                    }
+                }else{
+                    findToggle2 = false;
+                }
+            }
+
+            if(trainCount !== trainCount2){
+                available = false;
+            }
+
+            // 7. available 이 true 일때만 결과를 리턴한다.
+            if(available === true){
+                result.result = arrayCopy;
+                result.available = true;
+                return result;
+            }else{
+                result.result = array;
+                result.available = false;
+                return result;
+            }
+        }
+
+        function switchNum(array,start,length,direction){
+
+            // 1. 먼저 array 의 범위를 벗어나는지 확인한다.
+            if(start-1 < 0 || length+1 > array.length){
+                return {
+                    result: array,
+                    available: false
+                }
+            }
+
+            // 2. 숫자가 서로 다른지 확인한다.
+            if('left' === direction){
+                if(array[start-1] === array[length]){
+                    return {
+                        result: array,
+                        available: false
+                    }
+                }
+            }else if('right' === direction){
+                if(array[start] === array[length+1]){
+                    return {
+                        result: array,
+                        available: false
+                    }
+                }
+            }else{
+                return {
+                    result: array,
+                    available: false
+                }
+            }
+
+            // 3. 이동이 가능하다면 이동시킨다.
+            let arrayCopy = array.slice();
+            if('left' === direction){
+                arrayCopy[start-1] = array[length+1];
+                arrayCopy[length+1] = array[start-1];
+            }else if('right' === direction){
+                arrayCopy[start] = array[length+1];
+                arrayCopy[length+1] = array[start];
+            }
+
+            return {
+                result: arrayCopy,
+                available: true
+            }
+        }
+
+        function removeHints(){
+            const gameColHint = document.querySelector('.game-col-hint');
+            const hintRowContainer = document.querySelectorAll('.hint-row-container');
+            gameColHint.remove();
+            hintRowContainer.forEach(function(item){
+                item.remove();
+            });
+        }
+
+        function save(){
+            // save .game to png file
+            const game = document.querySelector('.game');
+            html2canvas(game).then(canvas => {
+                // document.body.appendChild(canvas);
+                const imgData = canvas.toDataURL('image/png');
+                saveImg(imgData, 'nonogram.png');
+            });
+        }
+        saveImg = (uri, filename) => {
+            let link = document.createElement('a');
+
+            document.body.appendChild(link);
+
+            link.href = uri;
+            link.download = filename;
+            link.click();
+
+            document.body.removeChild(link);
+        }
+
+        function reset(){
+            blockReset();
+            const game = document.querySelector('.game');
+            game.innerHTML = '';
+        }
+
+        function createBoard(){
+            reset();
+
+            const rownumber = rownumberObj.value;
+            const game = document.querySelector('.game');
+
+            // create row
+            for(let i = 0; i < rownumber; i++){
+                createRow(i, rownumber);
+            }
+
+            // create col hints
+            createColHints();
+        }
+
+        function createRow(index, cellnum){
+            const game = document.querySelector('.game');
+            const gameRowContainer = document.createElement('div');
+            gameRowContainer.classList.add('game-row-container');
+            gameRowContainer.setAttribute('data-index', index);
+            game.appendChild(gameRowContainer);
+
+            const gameRow = document.createElement('div');
+            gameRow.classList.add('game-row');
+            
+            for(let i = 0; i < cellnum; i++){
+                const gameCell = document.createElement('span');
+                gameCell.classList.add('game-cell');
+                gameCell.setAttribute('data-index', i);
+                gameRow.appendChild(gameCell);
+            }
+
+            gameRowContainer.appendChild(gameRow);
+
+            const hintRowContainer = document.createElement('div');
+            hintRowContainer.classList.add('hint-row-container');
+            gameRowContainer.appendChild(hintRowContainer);
+
+            const hintRow = document.createElement('input');
+            hintRow.classList.add('hint');
+            hintRow.setAttribute('type', 'number');
+            hintRow.setAttribute('name', 'hint-row');
+            hintRowContainer.appendChild(hintRow);
+
+            const plusBtn = document.createElement('button');
+            plusBtn.classList.add('plus');
+            plusBtn.innerHTML = '+';
+            hintRowContainer.appendChild(plusBtn);
+
+            // add event listener
+            plusBtn.addEventListener('click', function(){
+                // create hint
+                const hint = document.createElement('input');
+                hint.classList.add('hint');
+                hint.setAttribute('type', 'number');
+                hint.setAttribute('name', 'hint-row');
+                hintRowContainer.insertBefore(hint, plusBtn);
+            });
+        }
+
+        function createColHints(){
+            const rownumber = rownumberObj.value;
+            const game = document.querySelector('.game');
+            const gameColHint = document.createElement('div');
+
+            gameColHint.classList.add('game-col-hint');
+            game.appendChild(gameColHint);
+
+            for(let i = 0; i < rownumber; i++){
+                const hintColContainer = document.createElement('div');
+                hintColContainer.classList.add('hint-col-container');
+                gameColHint.appendChild(hintColContainer);
+
+                const hintCol = document.createElement('input');
+                hintCol.classList.add('hint');
+                hintCol.setAttribute('type', 'number');
+                hintCol.setAttribute('name', 'hint-col');
+                hintColContainer.appendChild(hintCol);
+
+                const plusBtn = document.createElement('button');
+                plusBtn.classList.add('plus');
+                plusBtn.innerHTML = '+';
+                hintColContainer.appendChild(plusBtn);
+
+                // add event listener
+                plusBtn.addEventListener('click', function(){
+                    // create hint
+                    const hint = document.createElement('input');
+                    hint.classList.add('hint');
+                    hint.setAttribute('type', 'number');
+                    hint.setAttribute('name', 'hint-col');
+                    hintColContainer.insertBefore(hint, plusBtn);
+                });
+            }
+        }
+    </script>
+</body>
+</html>
